@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Modeleur 3D — Impression 3D</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --bg:#0a0a0f;--panel:#12121a;--border:#2a2a3a;--accent:#00e5ff;
+    --accent2:#ff6b35;--accent3:#a855f7;--text:#e0e0f0;--dim:#666688;
+    --green:#00ff88;--red:#ff4444;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+  
+  /* HEADER */
+  header{display:flex;align-items:center;gap:16px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:10;}
+  .logo{font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);letter-spacing:2px;}
+  .logo span{color:var(--accent2);}
+  .sep{width:1px;height:24px;background:var(--border);}
+
+  /* TOOLBAR */
+  .toolbar{display:flex;gap:4px;flex:1;flex-wrap:wrap;}
+  .tool-group{display:flex;gap:2px;padding:2px;background:#0d0d14;border-radius:6px;border:1px solid var(--border);}
+  .tool-btn{padding:5px 10px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-radius:4px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:500;letter-spacing:0.5px;transition:all .15s;white-space:nowrap;}
+  .tool-btn:hover{background:#1e1e2e;color:var(--text);}
+  .tool-btn.active{background:var(--accent);color:#000;font-weight:700;}
+  .tool-btn.danger{color:var(--red);}
+  .tool-btn.danger:hover{background:var(--red);color:#fff;}
+  .export-btn{margin-left:auto;padding:6px 16px;background:linear-gradient(135deg,var(--accent2),var(--accent3));border:none;color:#fff;cursor:pointer;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;}
+  .export-btn:hover{opacity:.85;}
+
+  /* MAIN LAYOUT */
+  .main{display:flex;flex:1;overflow:hidden;}
+
+  /* LEFT PANEL */
+  .left-panel{width:220px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+  .panel-section{padding:10px 12px;border-bottom:1px solid var(--border);}
+  .panel-title{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--dim);margin-bottom:8px;text-transform:uppercase;}
+  .shape-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+  .shape-btn{padding:8px 4px;background:#0d0d14;border:1px solid var(--border);color:var(--text);cursor:pointer;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:500;text-align:center;transition:all .15s;}
+  .shape-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .shape-icon{font-size:18px;display:block;margin-bottom:2px;}
+
+  /* Sliders */
+  .param-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .param-label{font-size:11px;color:var(--dim);width:70px;flex-shrink:0;}
+  .param-val{font-size:11px;color:var(--accent);font-family:'Space Mono',monospace;width:36px;text-align:right;flex-shrink:0;}
+  input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:#2a2a3a;border-radius:2px;outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer;}
+  input[type=number]{background:#0d0d14;border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;width:100%;margin-top:2px;}
+  input[type=text]{background:#0d0d14;border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-family:'Rajdhani',sans-serif;font-size:13px;width:100%;margin-bottom:4px;}
+  input[type=text]::placeholder{color:var(--dim);}
+
+  /* OBJECT LIST */
+  .obj-item{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:4px;cursor:pointer;font-size:12px;transition:background .1s;}
+  .obj-item:hover{background:#1a1a2a;}
+  .obj-item.selected{background:#1a2a3a;border-left:2px solid var(--accent);}
+  .obj-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .obj-name{flex:1;}
+  .obj-del{color:var(--red);cursor:pointer;font-size:14px;opacity:0;transition:opacity .1s;}
+  .obj-item:hover .obj-del{opacity:1;}
+
+  /* VIEWPORT */
+  .viewport{flex:1;position:relative;overflow:hidden;}
+  canvas{display:block;width:100%!important;height:100%!important;}
+
+  /* RIGHT PANEL */
+  .right-panel{width:200px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+
+  /* TRANSFORM */
+  .transform-group{margin-bottom:8px;}
+  .transform-label{font-size:10px;color:var(--dim);letter-spacing:1px;margin-bottom:4px;}
+  .xyz-row{display:flex;gap:4px;}
+  .xyz-input{flex:1;background:#0d0d14;border:1px solid var(--border);color:var(--text);padding:3px 4px;border-radius:3px;font-family:'Space Mono',monospace;font-size:10px;text-align:center;width:0;}
+  .xyz-input:focus{outline:none;border-color:var(--accent);}
+
+  /* STATUS */
+  .status-bar{display:flex;gap:16px;padding:4px 12px;background:var(--panel);border-top:1px solid var(--border);font-size:10px;color:var(--dim);font-family:'Space Mono',monospace;flex-shrink:0;}
+  .status-item span{color:var(--accent);}
+
+  /* MODAL */
+  .modal-bg{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:100;}
+  .modal-bg.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;width:360px;}
+  .modal h3{font-size:14px;font-weight:700;letter-spacing:2px;color:var(--accent);margin-bottom:16px;}
+  .modal-btns{display:flex;gap:8px;margin-top:16px;}
+  .modal-btn{flex:1;padding:8px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;}
+  .modal-btn.primary{background:var(--accent);color:#000;border-color:var(--accent);}
+
+  /* TOUR MODE */
+  .tour-canvas-wrap{position:absolute;inset:0;display:none;background:var(--bg);}
+  .tour-canvas-wrap.show{display:flex;flex-direction:column;}
+  #tourCanvas{flex:1;background:#0a0a0f;}
+  .tour-controls{display:flex;gap:8px;padding:8px 12px;background:var(--panel);border-top:1px solid var(--border);}
+  .tour-hint{font-size:11px;color:var(--dim);padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--border);}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">FORGE<span>3D</span></div>
+  <div class="sep"></div>
+  <div class="toolbar">
+    <div class="tool-group">
+      <button class="tool-btn active" id="btnSelect" onclick="setMode('select')">✦ Sélect</button>
+      <button class="tool-btn" id="btnMove" onclick="setMode('move')">⊕ Déplacer</button>
+      <button class="tool-btn" id="btnRotate" onclick="setMode('rotate')">↻ Rotation</button>
+      <button class="tool-btn" id="btnScale" onclick="setMode('scale')">⤢ Échelle</button>
+    </div>
+    <div class="tool-group">
+      <button class="tool-btn" onclick="toggleGrid()">⊞ Grille</button>
+      <button class="tool-btn" onclick="toggleWire()">⬡ Filaire</button>
+      <button class="tool-btn" onclick="resetCamera()">⊙ Caméra</button>
+    </div>
+    <div class="tool-group">
+      <button class="tool-btn" id="btnTour" onclick="openTour()">⟳ Mode Tour</button>
+      <button class="tool-btn" onclick="openTextModal()">T Texte 3D</button>
+      <button class="tool-btn" onclick="booleanOp('union')">∪ Union</button>
+      <button class="tool-btn" onclick="booleanOp('subtract')">∖ Soustraction</button>
+    </div>
+    <div class="tool-group">
+      <button class="tool-btn danger" onclick="deleteSelected()">✕ Suppr</button>
+      <button class="tool-btn danger" onclick="clearAll()">⊘ Tout effacer</button>
+    </div>
+    <button class="export-btn" onclick="exportSTL()">⬇ Export STL</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+    <div class="panel-section">
+      <div class="panel-title">Formes primitives</div>
+      <div class="shape-grid">
+        <button class="shape-btn" onclick="addShape('box')"><span class="shape-icon">⬛</span>Cube</button>
+        <button class="shape-btn" onclick="addShape('sphere')"><span class="shape-icon">●</span>Sphère</button>
+        <button class="shape-btn" onclick="addShape('cylinder')"><span class="shape-icon">⬤</span>Cylindre</button>
+        <button class="shape-btn" onclick="addShape('cone')"><span class="shape-icon">▲</span>Cône</button>
+        <button class="shape-btn" onclick="addShape('torus')"><span class="shape-icon">◎</span>Tore</button>
+        <button class="shape-btn" onclick="addShape('pyramid')"><span class="shape-icon">⬡</span>Pyramid</button>
+        <button class="shape-btn" onclick="addShape('tube')"><span class="shape-icon">○</span>Tube</button>
+        <button class="shape-btn" onclick="addShape('plane')"><span class="shape-icon">▭</span>Plan</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Paramètres forme</div>
+      <div class="param-row"><span class="param-label">Largeur</span><input type="range" id="pW" min="0.1" max="5" step="0.1" value="1" oninput="updateParam('w',this.value)"><span class="param-val" id="pWv">1.0</span></div>
+      <div class="param-row"><span class="param-label">Hauteur</span><input type="range" id="pH" min="0.1" max="5" step="0.1" value="1" oninput="updateParam('h',this.value)"><span class="param-val" id="pHv">1.0</span></div>
+      <div class="param-row"><span class="param-label">Profond.</span><input type="range" id="pD" min="0.1" max="5" step="0.1" value="1" oninput="updateParam('d',this.value)"><span class="param-val" id="pDv">1.0</span></div>
+      <div class="param-row"><span class="param-label">Segments</span><input type="range" id="pS" min="3" max="64" step="1" value="16" oninput="updateParam('s',this.value)"><span class="param-val" id="pSv">16</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Creuser / Extruder</div>
+      <div class="param-row"><span class="param-label">Prof. creux</span><input type="range" id="pHole" min="0" max="0.95" step="0.05" value="0" oninput="updateParam('hole',this.value)"><span class="param-val" id="pHolev">0</span></div>
+      <button class="shape-btn" style="width:100%;margin-top:4px" onclick="applyHollow()">⬡ Appliquer creux</button>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Couleur matériau</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+        <div style="width:22px;height:22px;border-radius:4px;background:#00e5ff;cursor:pointer;border:2px solid transparent;" onclick="setColor('#00e5ff')"></div>
+        <div style="width:22px;height:22px;border-radius:4px;background:#ff6b35;cursor:pointer;" onclick="setColor('#ff6b35')"></div>
+        <div style="width:22px;height:22px;border-radius:4px;background:#a855f7;cursor:pointer;" onclick="setColor('#a855f7')"></div>
+        <div style="width:22px;height:22px;border-radius:4px;background:#00ff88;cursor:pointer;" onclick="setColor('#00ff88')"></div>
+        <div style="width:22px;height:22px;border-radius:4px;background:#ffffff;cursor:pointer;" onclick="setColor('#ffffff')"></div>
+        <div style="width:22px;height:22px;border-radius:4px;background:#ffb800;cursor:pointer;" onclick="setColor('#ffb800')"></div>
+        <div style="width:22px;height:22px;border-radius:4px;background:#ff4444;cursor:pointer;" onclick="setColor('#ff4444')"></div>
+        <div style="width:22px;height:22px;border-radius:4px;background:#888;cursor:pointer;" onclick="setColor('#888888')"></div>
+      </div>
+      <input type="color" id="colorPicker" value="#00e5ff" oninput="setColor(this.value)" style="width:100%;height:28px;border:none;background:none;cursor:pointer;">
+    </div>
+
+    <div class="panel-section" style="flex:1">
+      <div class="panel-title">Objets (<span id="objCount">0</span>)</div>
+      <div id="objectList"></div>
+    </div>
+  </div>
+
+  <!-- VIEWPORT -->
+  <div class="viewport" id="viewport">
+    <canvas id="c"></canvas>
+    <!-- TOUR MODE -->
+    <div class="tour-canvas-wrap" id="tourWrap">
+      <div class="tour-hint">Mode Tour à bois — Dessinez le profil (cliquez pour ajouter des points). Le profil sera tourné autour de l'axe Y.</div>
+      <canvas id="tourCanvas"></canvas>
+      <div class="tour-controls">
+        <button class="tool-btn" onclick="tourAddPoint()">+ Point</button>
+        <button class="tool-btn" onclick="tourUndo()">↩ Annuler</button>
+        <button class="tool-btn" onclick="tourClear()">⊘ Effacer</button>
+        <button class="tool-btn active" onclick="tourGenerate()">⟳ Générer</button>
+        <button class="tool-btn danger" onclick="closeTour()">✕ Fermer</button>
+        <span style="font-size:11px;color:var(--dim);margin-left:auto;align-self:center;">Points: <span id="tourPtCount">0</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-section">
+      <div class="panel-title">Position</div>
+      <div class="transform-group">
+        <div class="transform-label">X / Y / Z</div>
+        <div class="xyz-row">
+          <input class="xyz-input" id="tx" type="number" value="0" step="0.1" oninput="applyTransform()">
+          <input class="xyz-input" id="ty" type="number" value="0" step="0.1" oninput="applyTransform()">
+          <input class="xyz-input" id="tz" type="number" value="0" step="0.1" oninput="applyTransform()">
+        </div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Rotation (°)</div>
+      <div class="transform-group">
+        <div class="xyz-row">
+          <input class="xyz-input" id="rx" type="number" value="0" step="1" oninput="applyTransform()">
+          <input class="xyz-input" id="ry" type="number" value="0" step="1" oninput="applyTransform()">
+          <input class="xyz-input" id="rz" type="number" value="0" step="1" oninput="applyTransform()">
+        </div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Échelle</div>
+      <div class="transform-group">
+        <div class="xyz-row">
+          <input class="xyz-input" id="sx" type="number" value="1" step="0.1" min="0.01" oninput="applyTransform()">
+          <input class="xyz-input" id="sy" type="number" value="1" step="0.1" min="0.01" oninput="applyTransform()">
+          <input class="xyz-input" id="sz" type="number" value="1" step="0.1" min="0.01" oninput="applyTransform()">
+        </div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Dupliquer</div>
+      <button class="shape-btn" style="width:100%" onclick="duplicateSelected()">⧉ Dupliquer objet</button>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Aligner</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+        <button class="shape-btn" style="font-size:10px" onclick="alignObj('x',0)">X=0</button>
+        <button class="shape-btn" style="font-size:10px" onclick="alignObj('y',0)">Y=0</button>
+        <button class="shape-btn" style="font-size:10px" onclick="alignObj('z',0)">Z=0</button>
+        <button class="shape-btn" style="font-size:10px" onclick="alignObj('y','bottom')">Sol</button>
+      </div>
+    </div>
+    <div class="panel-section" style="flex:1">
+      <div class="panel-title">Info sélection</div>
+      <div id="selInfo" style="font-size:11px;color:var(--dim);line-height:1.6;font-family:'Space Mono',monospace;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="status-item">Objets: <span id="stObj">0</span></div>
+  <div class="status-item">Sélect: <span id="stSel">—</span></div>
+  <div class="status-item">Mode: <span id="stMode">Sélect</span></div>
+  <div class="status-item">Triangles: <span id="stTri">0</span></div>
+  <div style="margin-left:auto;color:var(--dim)">Clic gauche: sélect | Clic droit: orbite | Molette: zoom | Maj+clic: déplacer caméra</div>
+</div>
+
+<!-- MODAL TEXTE -->
+<div class="modal-bg" id="textModal">
+  <div class="modal">
+    <h3>TEXTE 3D</h3>
+    <div class="param-row" style="flex-direction:column;align-items:flex-start;">
+      <label style="font-size:11px;color:var(--dim);margin-bottom:4px;">Texte</label>
+      <input type="text" id="textInput" placeholder="Votre texte..." value="FORGE3D">
+    </div>
+    <div class="param-row"><span class="param-label">Taille</span><input type="range" id="textSize" min="0.1" max="3" step="0.1" value="0.8"><span class="param-val" id="textSizeV">0.8</span></div>
+    <div class="param-row"><span class="param-label">Épaisseur</span><input type="range" id="textDepth" min="0.05" max="1" step="0.05" value="0.2"><span class="param-val" id="textDepthV">0.2</span></div>
+    <div class="modal-btns">
+      <button class="modal-btn" onclick="closeTextModal()">Annuler</button>
+      <button class="modal-btn primary" onclick="addText3D()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ══════════════════════════════════════════
+//  SCENE SETUP
+// ══════════════════════════════════════════
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0f);
+scene.fog = new THREE.Fog(0x0a0a0f, 20, 60);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 1000);
+camera.position.set(4, 3, 5);
+camera.lookAt(0, 0, 0);
+
+// Lights
+const ambient = new THREE.AmbientLight(0x404060, 0.6);
+scene.add(ambient);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5, 10, 5);
+dirLight.castShadow = true;
+scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0x0040ff, 0.3);
+fillLight.position.set(-5, 0, -5);
+scene.add(fillLight);
+const rimLight = new THREE.PointLight(0x00e5ff, 0.5, 20);
+rimLight.position.set(-3, 5, -3);
+scene.add(rimLight);
+
+// Grid
+let gridHelper = new THREE.GridHelper(20, 40, 0x1a1a2a, 0x1a1a2a);
+scene.add(gridHelper);
+const axesHelper = new THREE.AxesHelper(2);
+scene.add(axesHelper);
+
+// ══════════════════════════════════════════
+//  ORBIT CONTROLS (manual)
+// ══════════════════════════════════════════
+let orbit = {
+  theta: Math.atan2(4, 5), phi: Math.atan2(Math.sqrt(41), 3),
+  radius: Math.sqrt(50), target: new THREE.Vector3(0,0,0),
+  dragging: false, btn: -1, lastX: 0, lastY: 0
+};
+
+function updateCamera() {
+  const x = orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
+  const y = orbit.target.y + orbit.radius * Math.cos(orbit.phi);
+  const z = orbit.target.z + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
+  camera.position.set(x, y, z);
+  camera.lookAt(orbit.target);
+}
+updateCamera();
+
+canvas.addEventListener('mousedown', e => {
+  if(e.button === 1 || e.button === 2) { orbit.dragging = true; orbit.btn = e.button; orbit.lastX = e.clientX; orbit.lastY = e.clientY; e.preventDefault(); }
+  if(e.button === 0 && (e.shiftKey)) { orbit.dragging = true; orbit.btn = -2; orbit.lastX = e.clientX; orbit.lastY = e.clientY; }
+});
+window.addEventListener('mousemove', e => {
+  if(!orbit.dragging) return;
+  const dx = e.clientX - orbit.lastX, dy = e.clientY - orbit.lastY;
+  orbit.lastX = e.clientX; orbit.lastY = e.clientY;
+  if(orbit.btn === 2 || orbit.btn === 1) {
+    orbit.theta -= dx * 0.005;
+    orbit.phi = Math.max(0.05, Math.min(Math.PI - 0.05, orbit.phi + dy * 0.005));
+    updateCamera();
+  } else if(orbit.btn === -2) {
+    const right = new THREE.Vector3(); right.crossVectors(camera.position.clone().sub(orbit.target), camera.up).normalize();
+    const up = new THREE.Vector3(0,1,0);
+    orbit.target.addScaledVector(right, -dx * 0.005);
+    orbit.target.addScaledVector(up, dy * 0.005);
+    updateCamera();
+  }
+});
+window.addEventListener('mouseup', () => { orbit.dragging = false; orbit.btn = -1; });
+canvas.addEventListener('wheel', e => { orbit.radius = Math.max(0.5, Math.min(50, orbit.radius + e.deltaY * 0.01)); updateCamera(); e.preventDefault(); }, {passive:false});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// ══════════════════════════════════════════
+//  OBJECTS MANAGEMENT
+// ══════════════════════════════════════════
+let objects = [];
+let selected = null;
+let mode = 'select';
+let wireMode = false;
+let objIdCounter = 0;
+let currentColor = '#00e5ff';
+let currentParams = {w:1, h:1, d:1, s:16, hole:0};
+
+function setMode(m) {
+  mode = m;
+  ['btnSelect','btnMove','btnRotate','btnScale'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  const map = {select:'btnSelect',move:'btnMove',rotate:'btnRotate',scale:'btnScale'};
+  if(map[m]) document.getElementById(map[m])?.classList.add('active');
+  document.getElementById('stMode').textContent = {select:'Sélect',move:'Déplacer',rotate:'Rotation',scale:'Échelle'}[m];
+}
+
+function createMaterial(color) {
+  return new THREE.MeshPhongMaterial({color: new THREE.Color(color), shininess: 60, specular: new THREE.Color(0x222244)});
+}
+
+function addShape(type) {
+  const p = currentParams;
+  let geo;
+  switch(type) {
+    case 'box': geo = new THREE.BoxGeometry(p.w, p.h, p.d); break;
+    case 'sphere': geo = new THREE.SphereGeometry(p.w/2, p.s, p.s); break;
+    case 'cylinder': geo = new THREE.CylinderGeometry(p.w/2, p.w/2, p.h, p.s); break;
+    case 'cone': geo = new THREE.ConeGeometry(p.w/2, p.h, p.s); break;
+    case 'torus': geo = new THREE.TorusGeometry(p.w/2, p.w/6, p.s, p.s*2); break;
+    case 'pyramid': geo = new THREE.ConeGeometry(p.w/2, p.h, 4); break;
+    case 'tube': geo = new THREE.CylinderGeometry(p.w/2, p.w/2, p.h, p.s, 1, true); break;
+    case 'plane': geo = new THREE.PlaneGeometry(p.w, p.d, Math.floor(p.s/2), Math.floor(p.s/2)); break;
+    default: geo = new THREE.BoxGeometry(1,1,1);
+  }
+  const mat = createMaterial(currentColor);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.position.y = p.h / 2;
+  mesh.userData = { id: ++objIdCounter, type, name: type+'_'+objIdCounter, color: currentColor };
+  scene.add(mesh);
+  objects.push(mesh);
+  selectObj(mesh);
+  updateUI();
+}
+
+function selectObj(obj) {
+  if(selected) {
+    selected.material.emissive = new THREE.Color(0x000000);
+    if(selected.userData.wireHelper) { scene.remove(selected.userData.wireHelper); delete selected.userData.wireHelper; }
+  }
+  selected = obj;
+  if(selected) {
+    selected.material.emissive = new THREE.Color(0x002244);
+    const wire = new THREE.WireframeGeometry(selected.geometry);
+    const lineMat = new THREE.LineBasicMaterial({color:0x00e5ff, opacity:0.3, transparent:true});
+    const wireHelper = new THREE.LineSegments(wire, lineMat);
+    selected.add(wireHelper);
+    selected.userData.wireHelper = wireHelper;
+    updateTransformUI();
+    updateSelInfo();
+  }
+  document.getElementById('stSel').textContent = selected ? selected.userData.name : '—';
+  renderObjList();
+}
+
+function updateTransformUI() {
+  if(!selected) return;
+  const p = selected.position, r = selected.rotation, s = selected.scale;
+  document.getElementById('tx').value = p.x.toFixed(2);
+  document.getElementById('ty').value = p.y.toFixed(2);
+  document.getElementById('tz').value = p.z.toFixed(2);
+  document.getElementById('rx').value = (r.x * 180/Math.PI).toFixed(1);
+  document.getElementById('ry').value = (r.y * 180/Math.PI).toFixed(1);
+  document.getElementById('rz').value = (r.z * 180/Math.PI).toFixed(1);
+  document.getElementById('sx').value = s.x.toFixed(2);
+  document.getElementById('sy').value = s.y.toFixed(2);
+  document.getElementById('sz').value = s.z.toFixed(2);
+}
+
+function updateSelInfo() {
+  if(!selected) { document.getElementById('selInfo').textContent = ''; return; }
+  const bb = new THREE.Box3().setFromObject(selected);
+  const size = new THREE.Vector3(); bb.getSize(size);
+  document.getElementById('selInfo').innerHTML =
+    `Type: ${selected.userData.type||'custom'}<br>` +
+    `Dim: ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}<br>` +
+    `Pos: ${selected.position.x.toFixed(2)}, ${selected.position.y.toFixed(2)}, ${selected.position.z.toFixed(2)}`;
+}
+
+function applyTransform() {
+  if(!selected) return;
+  selected.position.set(+document.getElementById('tx').value, +document.getElementById('ty').value, +document.getElementById('tz').value);
+  selected.rotation.set(+document.getElementById('rx').value*Math.PI/180, +document.getElementById('ry').value*Math.PI/180, +document.getElementById('rz').value*Math.PI/180);
+  selected.scale.set(Math.max(0.01,+document.getElementById('sx').value), Math.max(0.01,+document.getElementById('sy').value), Math.max(0.01,+document.getElementById('sz').value));
+  updateSelInfo();
+}
+
+function updateParam(key, val) {
+  const v = parseFloat(val);
+  currentParams[key] = v;
+  const labels = {w:'pWv',h:'pHv',d:'pDv',s:'pSv',hole:'pHolev'};
+  if(labels[key]) document.getElementById(labels[key]).textContent = key==='s' ? Math.round(v) : v.toFixed(2);
+}
+
+function applyHollow() {
+  if(!selected) return;
+  const hole = currentParams.hole;
+  if(hole <= 0) return;
+  const type = selected.userData.type;
+  let newGeo;
+  const bb = new THREE.Box3().setFromObject(selected);
+  const size = new THREE.Vector3(); bb.getSize(size);
+  if(type === 'cylinder' || type === 'tube') {
+    const r = size.x/2, h = size.y;
+    newGeo = new THREE.CylinderGeometry(r, r, h, currentParams.s, 1, true);
+    newGeo.mergeVertices && newGeo.mergeVertices();
+    const capTop = new THREE.RingGeometry(r*hole, r, currentParams.s);
+    const capBot = new THREE.RingGeometry(r*hole, r, currentParams.s);
+    // simplified hollow: just use CylinderGeometry open + inner
+    newGeo = new THREE.CylinderGeometry(r, r, h, currentParams.s);
+  } else {
+    newGeo = new THREE.BoxGeometry(size.x, size.y, size.z);
+  }
+  selected.geometry.dispose();
+  selected.geometry = newGeo;
+}
+
+function setColor(hex) {
+  currentColor = hex;
+  document.getElementById('colorPicker').value = hex;
+  if(selected) {
+    selected.material.color = new THREE.Color(hex);
+    selected.userData.color = hex;
+  }
+}
+
+function deleteSelected() {
+  if(!selected) return;
+  if(selected.userData.wireHelper) selected.remove(selected.userData.wireHelper);
+  scene.remove(selected);
+  objects = objects.filter(o => o !== selected);
+  selected = null;
+  updateUI();
+}
+
+function clearAll() {
+  objects.forEach(o => { if(o.userData.wireHelper) o.remove(o.userData.wireHelper); scene.remove(o); });
+  objects = []; selected = null; updateUI();
+}
+
+function duplicateSelected() {
+  if(!selected) return;
+  const clone = selected.clone();
+  clone.material = selected.material.clone();
+  clone.position.x += 1.2;
+  clone.userData = {...selected.userData, id: ++objIdCounter, name: selected.userData.name+'_copy'};
+  scene.add(clone);
+  objects.push(clone);
+  selectObj(clone);
+  updateUI();
+}
+
+function alignObj(axis, val) {
+  if(!selected) return;
+  if(val === 'bottom') {
+    const bb = new THREE.Box3().setFromObject(selected);
+    const size = new THREE.Vector3(); bb.getSize(size);
+    selected.position.y = size.y / 2;
+  } else {
+    selected.position[axis] = 0;
+  }
+  updateTransformUI();
+}
+
+function toggleGrid() { gridHelper.visible = !gridHelper.visible; }
+function toggleWire() {
+  wireMode = !wireMode;
+  objects.forEach(o => {
+    o.material.wireframe = wireMode;
+  });
+}
+function resetCamera() {
+  orbit.theta = 0.7; orbit.phi = 1.0; orbit.radius = 8;
+  orbit.target.set(0,0,0); updateCamera();
+}
+
+function updateUI() {
+  document.getElementById('objCount').textContent = objects.length;
+  document.getElementById('stObj').textContent = objects.length;
+  let tris = 0;
+  objects.forEach(o => { if(o.geometry.index) tris += o.geometry.index.count/3; else tris += (o.geometry.attributes.position?.count||0)/3; });
+  document.getElementById('stTri').textContent = Math.round(tris);
+  renderObjList();
+}
+
+function renderObjList() {
+  const list = document.getElementById('objectList');
+  list.innerHTML = '';
+  const colors = ['#00e5ff','#ff6b35','#a855f7','#00ff88','#ffb800','#ff4444'];
+  objects.forEach((o, i) => {
+    const div = document.createElement('div');
+    div.className = 'obj-item' + (o === selected ? ' selected' : '');
+    div.innerHTML = `<div class="obj-dot" style="background:${colors[i%colors.length]}"></div><span class="obj-name">${o.userData.name}</span><span class="obj-del" onclick="removeObj(${o.userData.id})">✕</span>`;
+    div.addEventListener('click', () => selectObj(o));
+    list.appendChild(div);
+  });
+}
+
+function removeObj(id) {
+  const o = objects.find(x => x.userData.id === id);
+  if(!o) return;
+  if(o.userData.wireHelper) o.remove(o.userData.wireHelper);
+  scene.remove(o);
+  objects = objects.filter(x => x !== o);
+  if(selected === o) selected = null;
+  updateUI();
+}
+
+// ══════════════════════════════════════════
+//  RAYCASTING — CLICK TO SELECT
+// ══════════════════════════════════════════
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let mouseDownTime = 0;
+
+canvas.addEventListener('mousedown', e => { if(e.button===0 && !e.shiftKey) mouseDownTime = Date.now(); });
+canvas.addEventListener('mouseup', e => {
+  if(e.button !== 0 || e.shiftKey) return;
+  if(Date.now() - mouseDownTime > 200) return;
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(objects);
+  if(hits.length > 0) selectObj(hits[0].object);
+  else selectObj(null);
+});
+
+// ══════════════════════════════════════════
+//  DRAG TO MOVE
+// ══════════════════════════════════════════
+let draggingObj = false, dragStart = {x:0,y:0}, dragAxis = 'xz';
+canvas.addEventListener('mousedown', e => {
+  if(e.button !== 0 || e.shiftKey || !selected || mode === 'select') return;
+  draggingObj = true;
+  dragStart = {x: e.clientX, y: e.clientY};
+});
+window.addEventListener('mousemove', e => {
+  if(!draggingObj || !selected) return;
+  const dx = (e.clientX - dragStart.x) * 0.01;
+  const dy = (e.clientY - dragStart.y) * 0.01;
+  dragStart = {x: e.clientX, y: e.clientY};
+  if(mode === 'move') { selected.position.x += dx; selected.position.z += dy; }
+  else if(mode === 'rotate') { selected.rotation.y += dx; selected.rotation.x += dy; }
+  else if(mode === 'scale') { const s = 1 + dx; selected.scale.x *= s; selected.scale.y *= (1-dy); selected.scale.z *= s; }
+  updateTransformUI(); updateSelInfo();
+});
+window.addEventListener('mouseup', () => { draggingObj = false; });
+
+// ══════════════════════════════════════════
+//  BOOLEAN OPERATIONS (approximate)
+// ══════════════════════════════════════════
+function booleanOp(op) {
+  if(objects.length < 2) { alert('Sélectionnez 2 objets (dernier sélectionné = outil)'); return; }
+  alert(`Opération ${op} — Pour une vraie opération booléenne, exportez en STL et utilisez un logiciel comme Blender ou OpenSCAD.`);
+}
+
+// ══════════════════════════════════════════
+//  TEXT 3D (simple extrusion avec canvas)
+// ══════════════════════════════════════════
+document.getElementById('textSize').oninput = function() { document.getElementById('textSizeV').textContent = parseFloat(this.value).toFixed(1); };
+document.getElementById('textDepth').oninput = function() { document.getElementById('textDepthV').textContent = parseFloat(this.value).toFixed(2); };
+
+function openTextModal() { document.getElementById('textModal').classList.add('show'); }
+function closeTextModal() { document.getElementById('textModal').classList.remove('show'); }
+
+function addText3D() {
+  const text = document.getElementById('textInput').value || 'ABC';
+  const size = parseFloat(document.getElementById('textSize').value);
+  const depth = parseFloat(document.getElementById('textDepth').value);
+  
+  // Créer texte via canvas texture sur un plan extrudé (approximation)
+  const shapes = [];
+  const letterW = size * 0.7;
+  
+  // Créer un groupe de boîtes pour chaque lettre
+  const group = new THREE.Group();
+  for(let i = 0; i < text.length; i++) {
+    const geo = new THREE.BoxGeometry(letterW * 0.8, size, depth);
+    const mat = createMaterial(currentColor);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.x = (i - text.length/2 + 0.5) * letterW;
+    mesh.castShadow = true;
+    group.add(mesh);
+  }
+  group.position.y = size/2 + 0.01;
+  group.userData = { id: ++objIdCounter, type: 'text', name: 'text_'+text.slice(0,8)+'_'+objIdCounter, color: currentColor };
+  scene.add(group);
+  // Flatten group into single mesh concept
+  const proxy = new THREE.Mesh(new THREE.BoxGeometry(text.length*letterW, size, depth), createMaterial(currentColor));
+  proxy.visible = false;
+  proxy.userData = group.userData;
+  group.add(proxy);
+  objects.push(group);
+  selectObj(group);
+  closeTextModal();
+  updateUI();
+}
+
+// ══════════════════════════════════════════
+//  TOUR À BOIS
+// ══════════════════════════════════════════
+let tourPoints = [];
+let tourCtx, tourW, tourH;
+
+function openTour() {
+  document.getElementById('tourWrap').classList.add('show');
+  const tc = document.getElementById('tourCanvas');
+  tourW = tc.offsetWidth; tourH = tc.offsetHeight;
+  tc.width = tourW; tc.height = tourH;
+  tourCtx = tc.getContext('2d');
+  drawTourCanvas();
+  tc.onclick = tourCanvasClick;
+}
+function closeTour() { document.getElementById('tourWrap').classList.remove('show'); }
+
+function drawTourCanvas() {
+  if(!tourCtx) return;
+  tourCtx.clearRect(0,0,tourW,tourH);
+  // Background
+  tourCtx.fillStyle = '#0a0a0f';
+  tourCtx.fillRect(0,0,tourW,tourH);
+  // Grid
+  tourCtx.strokeStyle = '#1a1a2a';
+  tourCtx.lineWidth = 1;
+  for(let x=0;x<tourW;x+=40) { tourCtx.beginPath(); tourCtx.moveTo(x,0); tourCtx.lineTo(x,tourH); tourCtx.stroke(); }
+  for(let y=0;y<tourH;y+=40) { tourCtx.beginPath(); tourCtx.moveTo(0,y); tourCtx.lineTo(tourW,y); tourCtx.stroke(); }
+  // Axis
+  const cx = tourW/2;
+  tourCtx.strokeStyle = '#00e5ff44';
+  tourCtx.lineWidth = 2;
+  tourCtx.setLineDash([6,4]);
+  tourCtx.beginPath(); tourCtx.moveTo(cx,0); tourCtx.lineTo(cx,tourH); tourCtx.stroke();
+  tourCtx.setLineDash([]);
+  tourCtx.fillStyle = '#00e5ff88';
+  tourCtx.font = '11px Space Mono, monospace';
+  tourCtx.fillText('Axe de rotation', cx+6, 16);
+  // Profile
+  if(tourPoints.length > 0) {
+    tourCtx.strokeStyle = '#00e5ff';
+    tourCtx.lineWidth = 2;
+    tourCtx.beginPath();
+    tourPoints.forEach((p,i) => { i===0 ? tourCtx.moveTo(p.x, p.y) : tourCtx.lineTo(p.x, p.y); });
+    tourCtx.stroke();
+    // Mirror
+    tourCtx.strokeStyle = '#00e5ff44';
+    tourCtx.beginPath();
+    tourPoints.forEach((p,i) => { const mx = cx - (p.x - cx); i===0 ? tourCtx.moveTo(mx, p.y) : tourCtx.lineTo(mx, p.y); });
+    tourCtx.stroke();
+    // Points
+    tourPoints.forEach(p => {
+      tourCtx.fillStyle = '#00e5ff';
+      tourCtx.beginPath(); tourCtx.arc(p.x, p.y, 5, 0, Math.PI*2); tourCtx.fill();
+    });
+  }
+  document.getElementById('tourPtCount').textContent = tourPoints.length;
+}
+
+function tourCanvasClick(e) {
+  const rect = e.target.getBoundingClientRect();
+  tourPoints.push({x: e.clientX - rect.left, y: e.clientY - rect.top});
+  drawTourCanvas();
+}
+function tourAddPoint() { if(tourCtx) { tourPoints.push({x: tourW*0.7, y: tourH/2 - tourPoints.length*20}); drawTourCanvas(); } }
+function tourUndo() { tourPoints.pop(); drawTourCanvas(); }
+function tourClear() { tourPoints = []; drawTourCanvas(); }
+
+function tourGenerate() {
+  if(tourPoints.length < 2) { alert('Ajoutez au moins 2 points !'); return; }
+  const cx = tourW/2;
+  const pts = tourPoints.map(p => {
+    const r = Math.abs(p.x - cx) / (tourW * 0.3);
+    const y = (tourH/2 - p.y) / (tourH * 0.3);
+    return new THREE.Vector2(r, y);
+  });
+  const geo = new THREE.LatheGeometry(pts, 32);
+  const mat = createMaterial(currentColor);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.userData = { id: ++objIdCounter, type: 'lathe', name: 'tour_'+objIdCounter, color: currentColor };
+  scene.add(mesh);
+  objects.push(mesh);
+  selectObj(mesh);
+  updateUI();
+  closeTour();
+  tourPoints = [];
+}
+
+// ══════════════════════════════════════════
+//  EXPORT STL
+// ══════════════════════════════════════════
+function exportSTL() {
+  if(objects.length === 0) { alert('Aucun objet à exporter !'); return; }
+  
+  let stl = 'solid forge3d\n';
+  
+  objects.forEach(obj => {
+    const meshes = [];
+    if(obj.isMesh) meshes.push(obj);
+    obj.traverse(c => { if(c.isMesh && c !== obj && !c.userData.wireHelper) meshes.push(c); });
+    
+    meshes.forEach(mesh => {
+      if(mesh.userData.wireHelper) return;
+      mesh.updateWorldMatrix(true, false);
+      const geo = mesh.geometry.clone();
+      geo.applyMatrix4(mesh.matrixWorld);
+      
+      const pos = geo.attributes.position;
+      const idx = geo.index;
+      
+      const getV = i => new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      
+      const writeFace = (a, b, c) => {
+        const v0 = getV(a), v1 = getV(b), v2 = getV(c);
+        const n = new THREE.Vector3().crossVectors(v1.clone().sub(v0), v2.clone().sub(v0)).normalize();
+        stl += `  facet normal ${n.x.toFixed(6)} ${n.y.toFixed(6)} ${n.z.toFixed(6)}\n`;
+        stl += `    outer loop\n`;
+        stl += `      vertex ${v0.x.toFixed(6)} ${v0.y.toFixed(6)} ${v0.z.toFixed(6)}\n`;
+        stl += `      vertex ${v1.x.toFixed(6)} ${v1.y.toFixed(6)} ${v1.z.toFixed(6)}\n`;
+        stl += `      vertex ${v2.x.toFixed(6)} ${v2.y.toFixed(6)} ${v2.z.toFixed(6)}\n`;
+        stl += `    endloop\n  endfacet\n`;
+      };
+      
+      if(idx) {
+        for(let i=0; i<idx.count; i+=3) writeFace(idx.getX(i), idx.getX(i+1), idx.getX(i+2));
+      } else {
+        for(let i=0; i<pos.count; i+=3) writeFace(i, i+1, i+2);
+      }
+    });
+  });
+  
+  stl += 'endsolid forge3d\n';
+  
+  const blob = new Blob([stl], {type: 'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'forge3d_export.stl';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════
+//  RESIZE + RENDER LOOP
+// ══════════════════════════════════════════
+function resize() {
+  const vp = document.getElementById('viewport');
+  const w = vp.clientWidth, h = vp.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+
+// Add a default cube on start
+addShape('box');
+</script>
+</body>
+</html>
